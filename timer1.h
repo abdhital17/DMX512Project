@@ -5,10 +5,13 @@
 #ifndef TIMER1_H_
 #define TIMER1_H_
 
+#include <stdint.h>
 //-----------------------------------------------------------------------------
 // Subroutines
 //-----------------------------------------------------------------------------
 
-void initTimer1(uint32_t time_in_us);
+extern uint32_t phase;
+
+void initTimer1(uint32_t time);
 
 #endif

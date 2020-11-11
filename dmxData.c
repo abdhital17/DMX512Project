@@ -1,13 +1,15 @@
 // CSE 4342 Project
 // Abhishek Dhital
 
-
-//__________________________________________________Includes___________________________________________________________________________
-
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
+
+
+//__________________________________________________Includes___________________________________________________________________________
+
+
 #include "tm4c123gh6pm.h"
 #include "uart0.h"
 #include "wait.h"
@@ -42,12 +44,13 @@
 
 //__________________________________________________Global Variables_______________________________________________________________________
 
-static uint16_t max = 512;              //variable to hold the number of max devices on the bus; default value = 512
-static uint8_t dataTable[512];          //table that holds the data to be sent to devices on the bus
-static uint8_t hr, min, sec;            //variables to hold the hour, min and sec of the day
-static uint8_t mth, day;                //variables to hold the month and day
-static bool ON = false;                 //run boolean to specify whether DMX transmit is ON/OFF; set by the ON/OFF commands on UART0
-static uint32_t phase;                  //variable to hold the value of phase ranging from 0 (break condition) to 514
+ uint16_t max = 6;              //variable to hold the number of max devices on the bus; default value = 512
+ uint8_t dataTable[6];          //table that holds the data to be sent to devices on the bus
+ uint8_t hr, min, sec;            //variables to hold the hour, min and sec of the day
+ uint8_t mth, day;                //variables to hold the month and day
+ bool ON = false;                 //run boolean to specify whether DMX transmit is ON/OFF; set by the ON/OFF commands on UART0
+ uint32_t phase;                  //variable to hold the value of phase ranging from 0 (break condition) to 514
+
 
 
 
@@ -266,31 +269,37 @@ void deviceMode(uint16_t address)
 
 void clear()
 {
+    uint8_t i =0;
+    for (i=0; i < max; i++)
+    {
+        dataTable[i] = 0;
+    }
 
 }
 
 void startDMX_TX()
 {
-    phase = 0;
     DE_PIN = 1;
     D_PIN  = 0;
+    phase = 0;
     initTimer1(176);
 }
 
 
-
 int main(void)
 {
+    dataTable[0] = 0;
     initHw();
     initUart0();
     initUart1();
     initEeprom();
+    // Setup UART0 baud rate
+     setUart0BaudRate(115200, 40e6);
+     setUart1BaudRate(250000, 40e6);
 
 //    displayUart0("\nABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz\n\r");
 //    displayUart0("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz\n\r");
 
-    // Setup UART0 baud rate
-    setUart0BaudRate(115200, 40e6);
     USER_DATA data;
 
 

@@ -1,1 +1,1 @@
-"./dmxData.obj" "./eeprom.obj" "./tm4c123gh6pm_startup_ccs.obj" "./uart0.obj" "./wait.obj" "../tm4c123gh6pm.cmd" -llibc.a 
+"./dmxData.obj" "./eeprom.obj" "./timer1.obj" "./tm4c123gh6pm_startup_ccs.obj" "./uart0.obj" "./uart1.obj" "./wait.obj" "../tm4c123gh6pm.cmd" -llibc.a 

@@ -19,6 +19,8 @@ dmxData.obj: ../tm4c123gh6pm.h
 dmxData.obj: ../uart0.h
 dmxData.obj: ../wait.h
 dmxData.obj: ../eeprom.h
+dmxData.obj: ../uart1.h
+dmxData.obj: ../timer1.h
 
 ../dmxData.c: 
 C:/ti/ccs1011/ccs/tools/compiler/ti-cgt-arm_20.2.1.LTS/include/stdio.h: 
@@ -39,3 +41,5 @@ C:/ti/ccs1011/ccs/tools/compiler/ti-cgt-arm_20.2.1.LTS/include/stdlib.h:
 ../uart0.h: 
 ../wait.h: 
 ../eeprom.h: 
+../uart1.h: 
+../timer1.h: 

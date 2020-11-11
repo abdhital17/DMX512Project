@@ -12,8 +12,10 @@ GEN_CMDS__FLAG :=
 ORDERED_OBJS += \
 "./dmxData.obj" \
 "./eeprom.obj" \
+"./timer1.obj" \
 "./tm4c123gh6pm_startup_ccs.obj" \
 "./uart0.obj" \
+"./uart1.obj" \
 "./wait.obj" \
 "../tm4c123gh6pm.cmd" \
 $(GEN_CMDS__FLAG) \
@@ -158,8 +160,8 @@ DMX512Project.hex: $(EXE_OUTPUTS)
 # Other Targets
 clean:
 	-$(RM) $(BIN_OUTPUTS__QUOTED)$(EXE_OUTPUTS__QUOTED)
-	-$(RM) "dmxData.obj" "eeprom.obj" "tm4c123gh6pm_startup_ccs.obj" "uart0.obj" "wait.obj" 
-	-$(RM) "dmxData.d" "eeprom.d" "tm4c123gh6pm_startup_ccs.d" "uart0.d" "wait.d" 
+	-$(RM) "dmxData.obj" "eeprom.obj" "timer1.obj" "tm4c123gh6pm_startup_ccs.obj" "uart0.obj" "uart1.obj" "wait.obj" 
+	-$(RM) "dmxData.d" "eeprom.d" "timer1.d" "tm4c123gh6pm_startup_ccs.d" "uart0.d" "uart1.d" "wait.d" 
 	-@echo 'Finished clean'
 	-@echo ' '
 
