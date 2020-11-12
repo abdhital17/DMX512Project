@@ -21,7 +21,7 @@
 #include "uart1.h"
 
 
-// PortA masks
+// PortB masks
 #define R_MASK 1
 #define D_MASK 2
 
@@ -38,7 +38,7 @@
 //-----------------------------------------------------------------------------
 
 
-// Initialize UART0
+// Initialize UART1
 void initUart1()
 {
     // Configure HW to work with 16 MHz XTAL, PLL enabled, system clock of 40 MHz
@@ -57,13 +57,11 @@ void initUart1()
     GPIO_PORTB_DIR_R &= ~R_MASK;                   // enable input on UART1 RX pin
     GPIO_PORTB_DR2R_R |= D_MASK;                  // set drive strength to 2mA (not needed since default configuration -- for clarity)
     GPIO_PORTB_DEN_R |= D_MASK | R_MASK;          // enable digital on UART1 pins
-    GPIO_PORTB_AFSEL_R &= ~(D_MASK | R_MASK);     // use peripheral to drive PA0, PA1
+    GPIO_PORTB_AFSEL_R &= ~(D_MASK | R_MASK);     // DO *NOT* use peripheral to drive PB0, PB1; USE GPIO
     GPIO_PORTB_PCTL_R &= ~(GPIO_PCTL_PB0_M | GPIO_PCTL_PB1_M); // clear bits 0-7
-    //GPIO_PORTB_PCTL_R &= ~(GPIO_PCTL_PB0_U1RX | GPIO_PCTL_PB1_U1TX);
-                                                        // select UART0 to drive pins PA0 and PA1: default, added for clarity
 
     // Configure UART0 to 115200 baud, 8N1 format
-    UART1_CTL_R = 0;                                    // turn-off UART0 to allow safe programming
+    UART1_CTL_R = 0;                                    // turn-off UART1 to allow safe programming
     UART1_CC_R = UART_CC_CS_SYSCLK;                     // use system clock (40 MHz)
     UART1_IBRD_R = 10;                                  // r = 40 MHz / (Nx250kHz), set floor(r)=10, where N=16
     UART1_FBRD_R = 0;                                  // round(fract(r)*64)=0
@@ -84,33 +82,57 @@ void setUart1BaudRate(uint32_t baudRate, uint32_t fcyc)
     UART1_FBRD_R = ((divisorTimes128 + 1)) >> 1 & 63;    // set fractional value to round(fract(r)*64)
 }
 
+
+//function to send a byte of data through the UART1 TX
 void sendByteUart1(uint8_t data)
 {
     while (UART1_FR_R & UART_FR_TXFF);                  // wait if uart1 tx fifo full
     UART1_DR_R = data;                                  // write character to fifo
 }
 
+
+//Interrupt Service Routine to handle either RX or TX interrupt for the UART1 module
 void uart1ISR()
 {
-   if((phase - 1) < max)
+   if (UART1_MIS_R & 0x20)           //if tx interrupt triggered the isr
    {
-     sendByteUart1(dataTable[phase - 1]);
-     phase++;
-    }
+       if((phase - 1) < max)
+       {
+           sendByteUart1(dataTable[phase - 1]);
+           phase++;
+       }
 
-    else
-    {
-        UART1_IM_R  &= ~0x20;                 //disable the TX interrupt for UART1
+       else
+       {
+           UART1_IM_R  &= ~0x20;                 //disable the TX interrupt for UART1
 
-        GPIO_PORTB_AFSEL_R &= ~(D_MASK | R_MASK);  // use peripheral to drive PA0, PA1
-        GPIO_PORTB_PCTL_R &= ~(GPIO_PCTL_PB0_M | GPIO_PCTL_PB1_M); // clear bits 0-7
+           GPIO_PORTB_AFSEL_R &= ~(D_MASK | R_MASK);  // use peripheral to drive PA0, PA1
+           GPIO_PORTB_PCTL_R &= ~(GPIO_PCTL_PB0_M | GPIO_PCTL_PB1_M); // clear bits 0-7
 
-        while (UART1_FR_R & UART_FR_BUSY);                  // wait if uart1 tx fifo busy
 
-        if (ON)
-        {
-            DE_PIN = 0;
-            startDMX_TX();
-        }
-    }
+           if (ON)
+           {
+               while (UART1_FR_R & UART_FR_BUSY);                  // wait if uart1 tx fifo busy
+               DE_PIN = 0;
+               startDMX_TX();
+           }
+       }
+   }
+
+   else if (UART1_MIS_R & 0x10)              //if rx interrupt triggered the isr
+   {
+       uint16_t data = UART1_DATA_R;
+
+
+
+       if (data & 0x400)            //if break error occured in data register
+           phase = 0;
+
+       else                         //if not a break
+       {
+           dataTable[phase] = (data >> 4);      //store the lower 8 bits of the data
+           phase++;
+       }
+
+   }
 }

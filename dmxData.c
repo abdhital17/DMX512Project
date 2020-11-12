@@ -219,7 +219,7 @@ int32_t getFieldInteger(USER_DATA* data, uint8_t fieldNumber)
 
 bool isCommand(USER_DATA* data, const char strCommand[], uint8_t minArguments)
 {
- if(stringCompare(strCommand,getFieldString(data,0)) && (data->fieldCount)>minArguments)
+ if(stringCompare(strCommand,getFieldString(data,0)) && (data->fieldCount) == (minArguments + 1))
      return true;
  return false;
 }
@@ -263,6 +263,9 @@ void controllerMode()
 {
     writeEeprom(MODE_ADDRESS, CONTROLLER_FLAG);
     MODE = readEeprom(MODE_ADDRESS);
+
+    ON = true;
+    startDMX_TX();
 }
 
 void deviceMode(uint16_t address)
@@ -272,6 +275,10 @@ void deviceMode(uint16_t address)
 
     MODE = 0xFFFFFFFF;
     devAddr = address;
+
+    UART1_IM_R  |= 0x10;                 //enable the UART1 RX interrupt
+
+    ON = false;
 }
 
 void clear()
@@ -295,7 +302,8 @@ void startDMX_TX()
 
 int main(void)
 {
-    dataTable[0] = 0;
+    dataTable[0] = 0;               //start Code
+
     initHw();
     initUart0();
     initUart1();
@@ -314,6 +322,14 @@ int main(void)
 
         if(devAddr == 0xFFFFFFFF)
             devAddr = 1;
+
+        UART1_IM_R  |= 0x10;                 //enable the UART1 RX interrupt
+    }
+
+    else
+    {
+        ON = true;
+        startDMX_TX();
     }
 
 

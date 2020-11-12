@@ -4,13 +4,12 @@
 
 #include "timer1.h"
 #include <stdint.h>
-#include <stdint.h>
 #include "tm4c123gh6pm.h"
 
 
 
 //defines
-#define D_PIN      (*((volatile uint32_t *)(0x42000000 + (0x400053FC-0x40000000)*32 + 1*4)))   //port B1
+#define D_PIN      (*((volatile uint32_t *)(0x42000000 + (0x400053FC-0x40000000)*32 + 1*4)))   //port B1 -> UART1 TX
 
 // PortA masks
 #define R_MASK 1
@@ -65,7 +64,7 @@ void timer1ISR()
         TIMER1_CTL_R &= ~TIMER_CTL_TAEN;     // turn-off timer
         TIMER1_IMR_R &= ~TIMER_IMR_TATOIM;   // turn-off interrupts
 
-        GPIO_PORTB_AFSEL_R |= D_MASK | R_MASK;  // use peripheral to drive PA0, PA1
+        GPIO_PORTB_AFSEL_R |= D_MASK | R_MASK;  // use peripheral to drive PB0, PB1
         GPIO_PORTB_PCTL_R &= ~(GPIO_PCTL_PB0_M | GPIO_PCTL_PB1_M); // clear bits 0-7
         GPIO_PORTB_PCTL_R |= GPIO_PCTL_PB0_U1RX | GPIO_PCTL_PB1_U1TX;
 
