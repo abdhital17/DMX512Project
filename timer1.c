@@ -52,7 +52,7 @@ void initTimer1(uint32_t time)
 
 void timer1ISR()
 {
-    TIMER1_ICR_R = TIMER_ICR_TATOCINT;
+    TIMER1_ICR_R = TIMER_ICR_TATOCINT;      //clear the interrupt flag
 
     if(phase == 0)
     {

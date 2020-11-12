@@ -26,11 +26,11 @@
 #define CONTROLLER_FLAG 0xABCDEF        //flag to specify that the system is running in controller mode
                                         //this flag is stored at EEPROM address 0x0  in controller mode
 
-#define EEPROM_MODE_ADDRESS   0x0       // address in eeprom where the mode is specified to either controller/device
+#define MODE_ADDRESS   0x0     // address in eeprom where the mode is specified to either controller/device
                                         // if the data in this address is 0xFFFFFFFF, device mode is configured
                                         //if data in this address is 0xABCDEF, controller mode is configured
 
-#define EEPROM_DEVICE_ADDRESS 0x1       //address in eeprom where the device address is stored in device mode
+#define DEVICE_ADDRESS_LOCATION 0x1       //address in eeprom where the device address is stored in device mode
 
 //bitbanded aliases
 #define D_PIN      (*((volatile uint32_t *)(0x42000000 + (0x400053FC-0x40000000)*32 + 1*4)))   //port B1
@@ -50,6 +50,8 @@
  uint8_t mth, day;                //variables to hold the month and day
  bool ON = false;                 //run boolean to specify whether DMX transmit is ON/OFF; set by the ON/OFF commands on UART0
  uint16_t phase;                  //variable to hold the value of phase ranging from 0 (break condition) to 514
+ uint16_t devAddr = 1;            //variable to hold the address of the device when in Device Mode; Default value is set to 1
+ uint32_t MODE;
 
 
 
@@ -259,12 +261,17 @@ void addTask(uint16_t a, uint8_t v, uint8_t h, uint8_t m, uint8_t s, uint8_t mon
 
 void controllerMode()
 {
-    writeEeprom(EEPROM_MODE_ADDRESS, CONTROLLER_FLAG);
+    writeEeprom(MODE_ADDRESS, CONTROLLER_FLAG);
+    MODE = readEeprom(MODE_ADDRESS);
 }
 
 void deviceMode(uint16_t address)
 {
-    writeEeprom(EEPROM_DEVICE_ADDRESS, address);
+    writeEeprom(MODE_ADDRESS, 0xFFFFFFFF);
+    writeEeprom(DEVICE_ADDRESS_LOCATION, address);
+
+    MODE = 0xFFFFFFFF;
+    devAddr = address;
 }
 
 void clear()
@@ -294,11 +301,21 @@ int main(void)
     initUart1();
     initEeprom();
     // Setup UART0 baud rate
-     setUart0BaudRate(115200, 40e6);
-     //setUart1BaudRate(250000, 40e6);
+    setUart0BaudRate(115200, 40e6);
+    setUart1BaudRate(250000, 40e6);
 
 //    displayUart0("\nABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz\n\r");
 //    displayUart0("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz\n\r");
+
+    MODE = readEeprom(MODE_ADDRESS);
+    if ( MODE == 0xFFFFFFFF)
+    {
+        devAddr = readEeprom(DEVICE_ADDRESS_LOCATION);
+
+        if(devAddr == 0xFFFFFFFF)
+            devAddr = 1;
+    }
+
 
     USER_DATA data;
 

@@ -105,7 +105,8 @@ void uart1ISR()
         GPIO_PORTB_AFSEL_R &= ~(D_MASK | R_MASK);  // use peripheral to drive PA0, PA1
         GPIO_PORTB_PCTL_R &= ~(GPIO_PCTL_PB0_M | GPIO_PCTL_PB1_M); // clear bits 0-7
 
-        while (UART1_FR_R & UART_FR_BUSY);                  // wait if uart1 tx fifo full
+        while (UART1_FR_R & UART_FR_BUSY);                  // wait if uart1 tx fifo busy
+
         if (ON)
         {
             DE_PIN = 0;
