@@ -10,7 +10,7 @@
 // Subroutines
 //-----------------------------------------------------------------------------
 
-extern uint32_t phase;
+extern uint16_t phase;
 
 void initTimer1(uint32_t time);
 

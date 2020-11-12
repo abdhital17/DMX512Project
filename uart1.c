@@ -57,9 +57,9 @@ void initUart1()
     GPIO_PORTB_DIR_R &= ~R_MASK;                   // enable input on UART1 RX pin
     GPIO_PORTB_DR2R_R |= D_MASK;                  // set drive strength to 2mA (not needed since default configuration -- for clarity)
     GPIO_PORTB_DEN_R |= D_MASK | R_MASK;          // enable digital on UART1 pins
-    GPIO_PORTB_AFSEL_R |= D_MASK | R_MASK;  // use peripheral to drive PA0, PA1
+    GPIO_PORTB_AFSEL_R &= ~(D_MASK | R_MASK);     // use peripheral to drive PA0, PA1
     GPIO_PORTB_PCTL_R &= ~(GPIO_PCTL_PB0_M | GPIO_PCTL_PB1_M); // clear bits 0-7
-    //GPIO_PORTB_PCTL_R |= GPIO_PCTL_PB0_U1RX | GPIO_PCTL_PB1_U1TX;
+    //GPIO_PORTB_PCTL_R &= ~(GPIO_PCTL_PB0_U1RX | GPIO_PCTL_PB1_U1TX);
                                                         // select UART0 to drive pins PA0 and PA1: default, added for clarity
 
     // Configure UART0 to 115200 baud, 8N1 format
@@ -68,10 +68,11 @@ void initUart1()
     UART1_IBRD_R = 10;                                  // r = 40 MHz / (Nx250kHz), set floor(r)=10, where N=16
     UART1_FBRD_R = 0;                                  // round(fract(r)*64)=0
     UART1_LCRH_R = UART_LCRH_WLEN_8 | UART_LCRH_STP2 | UART_LCRH_FEN;
-    NVIC_EN0_R |= 1 << (INT_UART1-16);                  // turn-on interrupt 22 (UART1)
 
    UART1_CTL_R = UART_CTL_TXE | UART_CTL_RXE | UART_CTL_UARTEN | UART_CTL_EOT;
                                                         // enable TX, RX, and module
+   NVIC_EN0_R |= 1 << (INT_UART1-16);                  // turn-on interrupt 22 (UART1)
+
 }
 
 // Set baud rate as function of instruction cycle frequency
@@ -101,6 +102,10 @@ void uart1ISR()
     {
         UART1_IM_R  &= ~0x20;                 //disable the TX interrupt for UART1
 
+        GPIO_PORTB_AFSEL_R &= ~(D_MASK | R_MASK);  // use peripheral to drive PA0, PA1
+        GPIO_PORTB_PCTL_R &= ~(GPIO_PCTL_PB0_M | GPIO_PCTL_PB1_M); // clear bits 0-7
+
+        while (UART1_FR_R & UART_FR_BUSY);                  // wait if uart1 tx fifo full
         if (ON)
         {
             DE_PIN = 0;

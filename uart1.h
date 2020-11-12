@@ -20,7 +20,7 @@
 
 extern uint16_t max;              //variable to hold the number of max devices on the bus; default value = 512
 extern uint8_t dataTable[];          //table that holds the data to be sent to devices on the bus
-extern uint32_t phase;
+extern uint16_t phase;
 extern bool ON;
 
 extern void startDMX_TX();
