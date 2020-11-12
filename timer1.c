@@ -64,9 +64,9 @@ void timer1ISR()
         TIMER1_CTL_R &= ~TIMER_CTL_TAEN;     // turn-off timer
         TIMER1_IMR_R &= ~TIMER_IMR_TATOIM;   // turn-off interrupts
 
-        GPIO_PORTB_AFSEL_R |= D_MASK | R_MASK;  // use peripheral to drive PB0, PB1
-        GPIO_PORTB_PCTL_R &= ~(GPIO_PCTL_PB0_M | GPIO_PCTL_PB1_M); // clear bits 0-7
-        GPIO_PORTB_PCTL_R |= GPIO_PCTL_PB0_U1RX | GPIO_PCTL_PB1_U1TX;
+        GPIO_PORTB_AFSEL_R |= D_MASK;  // use peripheral to drive PB1
+        GPIO_PORTB_PCTL_R &= ~(GPIO_PCTL_PB1_M); // clear bits 4-7
+        GPIO_PORTB_PCTL_R |= GPIO_PCTL_PB1_U1TX;    //set bits 4-7 for UART1 TX control
 
         UART1_IM_R  |= 0x20;                 //enable the UART1 TX interrupt
 

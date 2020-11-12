@@ -19,6 +19,7 @@
 #include <stdbool.h>
 #include "tm4c123gh6pm.h"
 #include "uart1.h"
+#include "PWM.h"
 
 
 // PortB masks
@@ -106,8 +107,8 @@ void uart1ISR()
        {
            UART1_IM_R  &= ~0x20;                 //disable the TX interrupt for UART1
 
-           GPIO_PORTB_AFSEL_R &= ~(D_MASK | R_MASK);  // use peripheral to drive PA0, PA1
-           GPIO_PORTB_PCTL_R &= ~(GPIO_PCTL_PB0_M | GPIO_PCTL_PB1_M); // clear bits 0-7
+           GPIO_PORTB_AFSEL_R &= ~(D_MASK);  // *DO NOT* use peripheral to drive PA1 (UART1 TX)
+           GPIO_PORTB_PCTL_R &= ~(GPIO_PCTL_PB1_M); // clear bits 4-7
 
 
            if (ON)
@@ -121,12 +122,16 @@ void uart1ISR()
 
    else if (UART1_MIS_R & 0x10)              //if rx interrupt triggered the isr
    {
-       uint16_t data = UART1_DATA_R;
+       uint16_t data = UART1_DR_R;
 
 
 
        if (data & 0x400)            //if break error occured in data register
-           phase = 0;
+       {
+           initLEDPWM();
+           phase = 1;
+           setLEDPWM(2, dataTable[devAddr]);
+       }
 
        else                         //if not a break
        {

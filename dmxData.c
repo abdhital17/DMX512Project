@@ -26,7 +26,7 @@
 #define CONTROLLER_FLAG 0xABCDEF        //flag to specify that the system is running in controller mode
                                         //this flag is stored at EEPROM address 0x0  in controller mode
 
-#define MODE_ADDRESS   0x0     // address in eeprom where the mode is specified to either controller/device
+#define MODE_ADDRESS   0x0              // address in eeprom where the mode is specified to either controller/device
                                         // if the data in this address is 0xFFFFFFFF, device mode is configured
                                         //if data in this address is 0xABCDEF, controller mode is configured
 
@@ -39,7 +39,11 @@
 
 //Port C mask
 #define DE_MASK 128
+
+// PortB masks
+#define R_MASK 1
 #define D_MASK 2
+
 
 
 //__________________________________________________Global Variables_______________________________________________________________________
@@ -265,6 +269,13 @@ void controllerMode()
     MODE = readEeprom(MODE_ADDRESS);
 
     ON = true;
+
+
+    GPIO_PORTB_AFSEL_R &= ~(R_MASK);  // *DO NOT* use peripheral to drive PA1 (UART1 TX)
+    GPIO_PORTB_PCTL_R &= ~(GPIO_PCTL_PB0_M); // clear bits 0-3
+
+    UART1_IM_R  &= ~0x10;                 //disable the UART1 RX interrupt
+
     startDMX_TX();
 }
 
@@ -276,6 +287,11 @@ void deviceMode(uint16_t address)
     MODE = 0xFFFFFFFF;
     devAddr = address;
 
+    GPIO_PORTB_AFSEL_R |= R_MASK;          // use peripheral to drive PA1 (UART1 TX)
+    GPIO_PORTB_PCTL_R &= ~(GPIO_PCTL_PB0_M); // clear bits 0-3
+    GPIO_PORTB_PCTL_R |= (GPIO_PCTL_PB0_U1RX); // set bits 0-3 for UART1 RX control
+
+    UART1_IM_R &= ~0x20;                //disable the UART1 TX interrupt (if enabled)
     UART1_IM_R  |= 0x10;                 //enable the UART1 RX interrupt
 
     ON = false;
@@ -322,6 +338,9 @@ int main(void)
 
         if(devAddr == 0xFFFFFFFF)
             devAddr = 1;
+        GPIO_PORTB_AFSEL_R |= R_MASK;          // use peripheral to drive PA1 (UART1 TX)
+        GPIO_PORTB_PCTL_R &= ~(GPIO_PCTL_PB0_M); // clear bits 0-3
+        GPIO_PORTB_PCTL_R |= (GPIO_PCTL_PB0_U1RX); // set bits 0-3 for UART1 RX control
 
         UART1_IM_R  |= 0x10;                 //enable the UART1 RX interrupt
     }

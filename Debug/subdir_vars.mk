@@ -9,6 +9,7 @@ CMD_SRCS += \
 ../tm4c123gh6pm.cmd 
 
 C_SRCS += \
+../PWM.c \
 ../dmxData.c \
 ../eeprom.c \
 ../timer1.c \
@@ -18,6 +19,7 @@ C_SRCS += \
 ../wait.c 
 
 C_DEPS += \
+./PWM.d \
 ./dmxData.d \
 ./eeprom.d \
 ./timer1.d \
@@ -27,6 +29,7 @@ C_DEPS += \
 ./wait.d 
 
 OBJS += \
+./PWM.obj \
 ./dmxData.obj \
 ./eeprom.obj \
 ./timer1.obj \
@@ -36,6 +39,7 @@ OBJS += \
 ./wait.obj 
 
 OBJS__QUOTED += \
+"PWM.obj" \
 "dmxData.obj" \
 "eeprom.obj" \
 "timer1.obj" \
@@ -45,6 +49,7 @@ OBJS__QUOTED += \
 "wait.obj" 
 
 C_DEPS__QUOTED += \
+"PWM.d" \
 "dmxData.d" \
 "eeprom.d" \
 "timer1.d" \
@@ -54,6 +59,7 @@ C_DEPS__QUOTED += \
 "wait.d" 
 
 C_SRCS__QUOTED += \
+"../PWM.c" \
 "../dmxData.c" \
 "../eeprom.c" \
 "../timer1.c" \
