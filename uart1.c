@@ -130,7 +130,7 @@ void uart1ISR()
        {
            initLEDPWM();
            phase = 1;
-           setLEDPWM(2, dataTable[devAddr]);
+           setLEDPWM(1, dataTable[devAddr]);
        }
 
        else                         //if not a break

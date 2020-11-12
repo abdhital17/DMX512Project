@@ -265,36 +265,41 @@ void addTask(uint16_t a, uint8_t v, uint8_t h, uint8_t m, uint8_t s, uint8_t mon
 
 void controllerMode()
 {
+    ON = true;
+
     writeEeprom(MODE_ADDRESS, CONTROLLER_FLAG);
     MODE = readEeprom(MODE_ADDRESS);
 
-    ON = true;
+    while (UART1_FR_R & UART_FR_BUSY);                  // wait if uart1 tx fifo busy
+    UART1_IM_R  &= ~0x10;                 //disable the UART1 RX interrupt
 
-
-    GPIO_PORTB_AFSEL_R &= ~(R_MASK);  // *DO NOT* use peripheral to drive PA1 (UART1 TX)
+    GPIO_PORTB_AFSEL_R &= ~(R_MASK);  // *DO NOT* use peripheral to drive PB0 (UART1 TX)
     GPIO_PORTB_PCTL_R &= ~(GPIO_PCTL_PB0_M); // clear bits 0-3
 
-    UART1_IM_R  &= ~0x10;                 //disable the UART1 RX interrupt
 
     startDMX_TX();
 }
 
 void deviceMode(uint16_t address)
 {
+    ON = false;
+
     writeEeprom(MODE_ADDRESS, 0xFFFFFFFF);
     writeEeprom(DEVICE_ADDRESS_LOCATION, address);
-
     MODE = 0xFFFFFFFF;
     devAddr = address;
+
+    while (UART1_FR_R & UART_FR_BUSY);                  // wait if uart1 tx fifo busy
+    UART1_IM_R &= ~0x20;                //disable the UART1 TX interrupt (if enabled)
+    GPIO_PORTB_AFSEL_R &= ~(D_MASK);  // *DO NOT* use peripheral to drive PA1 (UART1 TX)
+    GPIO_PORTB_PCTL_R &= ~(GPIO_PCTL_PB1_M); // clear bits 4-7
 
     GPIO_PORTB_AFSEL_R |= R_MASK;          // use peripheral to drive PA1 (UART1 TX)
     GPIO_PORTB_PCTL_R &= ~(GPIO_PCTL_PB0_M); // clear bits 0-3
     GPIO_PORTB_PCTL_R |= (GPIO_PCTL_PB0_U1RX); // set bits 0-3 for UART1 RX control
 
-    UART1_IM_R &= ~0x20;                //disable the UART1 TX interrupt (if enabled)
     UART1_IM_R  |= 0x10;                 //enable the UART1 RX interrupt
 
-    ON = false;
 }
 
 void clear()
@@ -338,6 +343,7 @@ int main(void)
 
         if(devAddr == 0xFFFFFFFF)
             devAddr = 1;
+
         GPIO_PORTB_AFSEL_R |= R_MASK;          // use peripheral to drive PA1 (UART1 TX)
         GPIO_PORTB_PCTL_R &= ~(GPIO_PCTL_PB0_M); // clear bits 0-3
         GPIO_PORTB_PCTL_R |= (GPIO_PCTL_PB0_U1RX); // set bits 0-3 for UART1 RX control
@@ -451,13 +457,23 @@ int main(void)
 
     else if(isCommand(&data, "controller", 0))
     {
-        controllerMode();
+        if (MODE == 0xFFFFFFFF)
+            controllerMode();
+
+        else if (MODE == CONTROLLER_FLAG)
+            displayUart0("Already in controller mode \n\r");
+
         valid = true;
     }
 
     else if(isCommand(&data, "device", 1))
     {
-        deviceMode(getFieldInteger(&data, 1));
+        if (MODE == 0xFFFFFFFF)
+            displayUart0("Already in device mode\n\r");
+
+        else
+            deviceMode(getFieldInteger(&data, 1));
+
         valid = true;
 
     }
