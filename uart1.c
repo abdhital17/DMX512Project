@@ -18,6 +18,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "tm4c123gh6pm.h"
+#include "uart0.h"
 #include "uart1.h"
 #include "PWM.h"
 
@@ -124,8 +125,6 @@ void uart1ISR()
    {
        uint16_t data = UART1_DR_R;
 
-
-
        if (data & 0x400)            //if break error occured in data register
        {
            initLEDPWM();
@@ -135,8 +134,11 @@ void uart1ISR()
 
        else                         //if not a break
        {
-           dataTable[phase] = (data >> 4);      //store the lower 8 bits of the data
+           dataTable[phase] = (data << 4);      //store the lower 8 bits of the data
            phase++;
+
+           if (phase == 450)
+               displayUart0("done\n\r");
        }
 
    }

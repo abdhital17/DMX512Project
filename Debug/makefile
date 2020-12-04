@@ -141,7 +141,7 @@ BIN_OUTPUTS__QUOTED += \
 
 # All Target
 all: $(OBJS) $(CMD_SRCS) $(GEN_CMDS)
-	@$(MAKE) --no-print-directory -Onone "DMX512Project.out"
+	@$(MAKE) --no-print-directory -Onone "DMX512Project.out" secondary-outputs
 
 # Tool invocations
 DMX512Project.out: $(OBJS) $(CMD_SRCS) $(GEN_CMDS)
@@ -165,6 +165,8 @@ clean:
 	-$(RM) "PWM.d" "dmxData.d" "eeprom.d" "timer1.d" "tm4c123gh6pm_startup_ccs.d" "uart0.d" "uart1.d" "wait.d" 
 	-@echo 'Finished clean'
 	-@echo ' '
+
+secondary-outputs: $(BIN_OUTPUTS)
 
 .PHONY: all clean dependents
 .SECONDARY:

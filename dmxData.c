@@ -235,7 +235,9 @@ void setData(uint16_t add, uint8_t data)
 
 void getData(uint16_t add)
 {
-
+    char text[50];
+    sprintf(text,"%d\n",dataTable[add]);
+    displayUart0(text);
 }
 
 void setTime(uint8_t h, uint8_t m, uint8_t s)
@@ -377,6 +379,13 @@ int main(void)
        valid = true;
     }
 
+    else if(isCommand(&data, "address", 0))
+    {
+       char text[20];
+       sprintf(text, "address: %d\n\r", devAddr);
+       displayUart0(text);
+    }
+
     else if (isCommand(&data, "get", 1))
     {
         getData(getFieldInteger(&data, 1));
@@ -397,9 +406,16 @@ int main(void)
 
     else if (isCommand(&data, "on", 0))
     {
-        ON = true;
-        startDMX_TX();
+        if(MODE == CONTROLLER_FLAG)
+        {
+            ON = true;
+            startDMX_TX();
+        }
 
+        else
+        {
+            displayUart0("running on device mode. Can not turn on transmission\n\r");
+        }
         valid = true;
     }
 

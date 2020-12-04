@@ -13,6 +13,7 @@ uart1.obj: C:/ti/ccs1011/ccs/tools/compiler/ti-cgt-arm_20.2.1.LTS/include/machin
 uart1.obj: C:/ti/ccs1011/ccs/tools/compiler/ti-cgt-arm_20.2.1.LTS/include/sys/_stdint.h
 uart1.obj: C:/ti/ccs1011/ccs/tools/compiler/ti-cgt-arm_20.2.1.LTS/include/stdbool.h
 uart1.obj: ../tm4c123gh6pm.h
+uart1.obj: ../uart0.h
 uart1.obj: ../uart1.h
 uart1.obj: ../PWM.h
 
@@ -29,5 +30,6 @@ C:/ti/ccs1011/ccs/tools/compiler/ti-cgt-arm_20.2.1.LTS/include/machine/_stdint.h
 C:/ti/ccs1011/ccs/tools/compiler/ti-cgt-arm_20.2.1.LTS/include/sys/_stdint.h: 
 C:/ti/ccs1011/ccs/tools/compiler/ti-cgt-arm_20.2.1.LTS/include/stdbool.h: 
 ../tm4c123gh6pm.h: 
+../uart0.h: 
 ../uart1.h: 
 ../PWM.h: 
