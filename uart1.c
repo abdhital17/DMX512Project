@@ -130,11 +130,13 @@ void uart1ISR()
            initLEDPWM();
            phase = 1;
            setLEDPWM(1, dataTable[devAddr]);
+           setLEDPWM(2, dataTable[devAddr+1]);
+           setLEDPWM(3, dataTable[devAddr+2]);
        }
 
        else                         //if not a break
        {
-           dataTable[phase] = (data << 4);      //store the lower 8 bits of the data
+           dataTable[phase] = (data && 0xFF);      //store the lower 8 bits of the data
            phase++;
 
            if (phase == 450)

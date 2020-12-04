@@ -275,8 +275,8 @@ void controllerMode()
     while (UART1_FR_R & UART_FR_BUSY);                  // wait if uart1 tx fifo busy
     UART1_IM_R  &= ~0x10;                 //disable the UART1 RX interrupt
 
-    GPIO_PORTB_AFSEL_R &= ~(R_MASK);  // *DO NOT* use peripheral to drive PB0 (UART1 TX)
-    GPIO_PORTB_PCTL_R &= ~(GPIO_PCTL_PB0_M); // clear bits 0-3
+    GPIO_PORTB_AFSEL_R &= ~(R_MASK | D_MASK);  // *DO NOT* use peripheral to drive PB0 (UART1 TX)
+    GPIO_PORTB_PCTL_R &= ~(GPIO_PCTL_PB0_M | GPIO_PCTL_PB1_M); // clear bits 0-3
 
 
     startDMX_TX();
