@@ -24,12 +24,18 @@ extern uint16_t phase;
 extern uint16_t devAddr;
 extern bool ON;
 
+
+extern uint16_t pollIndex;
+extern bool pollMode;
+extern bool checkBreak;
+
 extern void startDMX_TX();
 
 
 //-----------------------------------------------------------------------------
 // Subroutines
 //-----------------------------------------------------------------------------
+extern void poll();
 
 void initUart1();
 void setUart1BaudRate(uint32_t baudRate, uint32_t fcyc);

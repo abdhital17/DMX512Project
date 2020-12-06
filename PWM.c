@@ -61,7 +61,7 @@ void initLEDPWM()
     GPIO_PORTF_DR2R_R |= RED_LED_MASK | BLUE_LED_MASK | GREEN_LED_MASK;                      // set drive strength to 2mA
     GPIO_PORTF_DEN_R |= RED_LED_MASK | BLUE_LED_MASK | GREEN_LED_MASK;                       // enable digital
     GPIO_PORTF_AFSEL_R |= RED_LED_MASK | BLUE_LED_MASK | GREEN_LED_MASK;                     // select auxilary function
-    GPIO_PORTF_PCTL_R &= (GPIO_PCTL_PF1_M | GPIO_PCTL_PF2_M |GPIO_PCTL_PF3_M);                      // enable PWM
+    GPIO_PORTF_PCTL_R &= ~(GPIO_PCTL_PF1_M | GPIO_PCTL_PF2_M |GPIO_PCTL_PF3_M);
     GPIO_PORTF_PCTL_R |= GPIO_PCTL_PF1_M1PWM5 | GPIO_PCTL_PF2_M1PWM6 | GPIO_PCTL_PF3_M1PWM7;
 
     // Configure PWM module 1 to drive on-board RGB LEDs
@@ -79,8 +79,8 @@ void initLEDPWM()
                                                      // output 4 on PWM0, gen 2a, cmpa
     PWM1_3_GENB_R = PWM_1_GENB_ACTCMPBD_ZERO | PWM_1_GENB_ACTLOAD_ONE;
                                                      // output 5 on PWM0, gen 2b, cmpb
-    PWM1_2_LOAD_R = 255;                            // set period to 40 MHz sys clock / 2 / 255 = 78.43137 kHz
-    PWM1_3_LOAD_R = 255;
+    PWM1_2_LOAD_R = 256;                            // set period to 40 MHz sys clock / 2 / 255 = 78.43137 kHz
+    PWM1_3_LOAD_R = 256;
     PWM1_INVERT_R = PWM_INVERT_PWM5INV | PWM_INVERT_PWM6INV | PWM_INVERT_PWM7INV;
                                                      // invert outputs so duty cycle increases with increasing compare values
     PWM1_2_CMPB_R = 0;                               // red off (0=always low, 1023=always high)
@@ -94,7 +94,7 @@ void initLEDPWM()
 }
 
 
-//rgb = 1 for RedLED, rgb = 2 for Blue LED, rgb =3 for Green LED
+//uint8_t rgb = 1 for RedLED, rgb = 2 for Blue LED, rgb =3 for Green LED
 void setLEDPWM(uint8_t rgb, uint8_t cmpb)
 {
     if (rgb == 1)
@@ -105,4 +105,10 @@ void setLEDPWM(uint8_t rgb, uint8_t cmpb)
 
     else if (rgb == 3)
         PWM1_3_CMPB_R = cmpb;
+}
+
+void uninitPWM()
+{
+    GPIO_PORTF_AFSEL_R &= ~(RED_LED_MASK | BLUE_LED_MASK | GREEN_LED_MASK);                     // use GPIO to control the LEDs
+    GPIO_PORTF_PCTL_R &= ~(GPIO_PCTL_PF1_M | GPIO_PCTL_PF2_M |GPIO_PCTL_PF3_M);
 }

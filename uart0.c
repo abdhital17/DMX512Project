@@ -27,13 +27,21 @@
 #define UART_TX_MASK 2
 #define UART_RX_MASK 1
 
+
+//on board LEDs
+//on board LED
+#define RED_LED   (*((volatile uint32_t *)(0x42000000 + (0x400253FC-0x40000000)*32 + 1*4)))  //PF1
+#define BLUE_LED  (*((volatile uint32_t *)(0x42000000 + (0x400053FC-0x40000000)*32 + 2*4)))  //PF2
+#define GREEN_LED (*((volatile uint32_t *)(0x42000000 + (0x400253FC-0x40000000)*32 + 3*4)))  //PF3
+
+
 //ring buffer
 #define BUFFER_LENGTH 256
 char TXBuffer[BUFFER_LENGTH];
 uint8_t readIndex = 0;
 uint8_t writeIndex = 0;
 
-
+#define CONTROLLER_FLAG 0xABCDEF
 //-----------------------------------------------------------------------------
 // Global variables
 //-----------------------------------------------------------------------------
@@ -108,6 +116,11 @@ void putsUart0(char* str)
 char getcUart0()
 {
     while (UART0_FR_R & UART_FR_RXFE);               // wait if uart0 rx fifo empty
+/*    if(MODE == CONTROLLER_FLAG)
+    {
+        BLUE_LED = 0;
+        RED_TIMEOUT_OFF = 10;
+    }*/
     return UART0_DR_R & 0xFF;                        // get character from fifo
 }
 

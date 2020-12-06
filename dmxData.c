@@ -37,6 +37,21 @@
 #define DE_PIN     (*((volatile uint32_t *)(0x42000000 + (0x400063FC-0x40000000)*32 + 7*4)))   //port C7
 
 
+
+//on board LED
+#define RED_LED   (*((volatile uint32_t *)(0x42000000 + (0x400253FC-0x40000000)*32 + 1*4)))  //PF1
+#define BLUE_LED  (*((volatile uint32_t *)(0x42000000 + (0x400053FC-0x40000000)*32 + 2*4)))  //PF2
+#define GREEN_LED (*((volatile uint32_t *)(0x42000000 + (0x400253FC-0x40000000)*32 + 3*4)))  //PF3
+
+//LED MASKS
+#define RED_LED_MASK 2
+#define BLUE_LED_MASK 4
+#define GREEN_LED_MASK 8
+
+//LED counts
+uint8_t RED_TIMEOUT_OFF;
+
+
 //Port C mask
 #define DE_MASK 128
 
@@ -48,17 +63,23 @@
 
 //__________________________________________________Global Variables_______________________________________________________________________
 
- uint16_t max = 513;                //variable to hold the number of max devices on the bus; default value = 512
- uint8_t dataTable[513];            //table that holds the data to be sent to devices on the bus
- uint8_t hr, min, sec;            //variables to hold the hour, min and sec of the day
- uint8_t mth, day;                //variables to hold the month and day
- bool ON = false;                 //run boolean to specify whether DMX transmit is ON/OFF; set by the ON/OFF commands on UART0
- uint16_t phase;                  //variable to hold the value of phase ranging from 0 (break condition) to 514
- uint16_t devAddr = 1;            //variable to hold the address of the device when in Device Mode; Default value is set to 1
+ uint16_t max = 514;                //variable to hold the number of max devices on the bus; default value = 512
+ uint8_t dataTable[513];            //table that holds the data to be sent to devices on the bus;
+                                    //(receive mode contains MAB on index 0) so need an extra index to hold the last value transmitted
+
+ uint8_t hr, min, sec;              //variables to hold the hour, min and sec of the day
+ uint8_t mth, day;                  //variables to hold the month and day
+ bool ON = false;                   //run boolean to specify whether DMX transmit is ON/OFF; set by the ON/OFF commands on UART0
+ uint16_t phase;                    //variable to hold the value of phase ranging from 0 (break condition) to 514
+ uint16_t devAddr = 1;              //variable to hold the address of the device when in Device Mode; Default value is set to 1
  uint32_t MODE;
 
 
-
+ //poll variables
+bool pollMode = false;
+uint8_t startCode = 0;              //0x00 for transmission mode; 0xF7 for polling mode
+uint16_t pollIndex = 0;
+bool checkBreak = false;            //true when the controller releases the bus to receive an ack from the devices while polling
 
 //data structure to hold the incoming string through the UART0 Rx
 typedef struct _USER_DATA
@@ -83,8 +104,14 @@ void initHw()
     SYSCTL_GPIOHBCTL_R = 0;
 
     // Enable clocks
-    SYSCTL_RCGCGPIO_R = SYSCTL_RCGCGPIO_R1 | SYSCTL_RCGCGPIO_R2;
+    SYSCTL_RCGCGPIO_R = SYSCTL_RCGCGPIO_R1 | SYSCTL_RCGCGPIO_R2 | SYSCTL_RCGCGPIO_R5;
+    SYSCTL_RCGCTIMER_R |=SYSCTL_RCGCTIMER_R1;
     _delay_cycles(3);
+
+    //configure the on board LEDs
+    GPIO_PORTF_DIR_R  |= RED_LED_MASK | GREEN_LED_MASK | BLUE_LED_MASK;
+    GPIO_PORTF_DR2R_R |= RED_LED_MASK | GREEN_LED_MASK | BLUE_LED_MASK;
+    GPIO_PORTF_DEN_R  |= RED_LED_MASK | GREEN_LED_MASK | BLUE_LED_MASK;
 
     // Configure GPIO for D pin in port B0 and DE pin in port C7
     GPIO_PORTB_DIR_R  |= D_MASK;
@@ -95,8 +122,27 @@ void initHw()
     GPIO_PORTC_DR2R_R |= DE_MASK;
     GPIO_PORTC_DEN_R  |= DE_MASK;
 
+
+    // Configure Timer 0 as the time base
+//    TIMER0_CTL_R &= ~TIMER_CTL_TAEN;                 // turn-off timer before reconfiguring
+//    TIMER0_CFG_R = TIMER_CFG_32_BIT_TIMER;           // configure as 32-bit timer (A+B)
+//    TIMER0_TAMR_R = TIMER_TAMR_TAMR_PERIOD;          // configure for one shot mode (count down)
+//
+//    TIMER0_TAILR_R = 4000000;
+//    TIMER0_IMR_R = TIMER_IMR_TATOIM;                 // turn-on interrupts
+//    NVIC_EN0_R |= 1 << (INT_TIMER0A-16);             // turn-on interrupt 37 (TIMER1A)
+//    TIMER0_CTL_R |= TIMER_CTL_TAEN;                  // turn-on timer
 }
 
+
+void timer0ISR()
+{
+    //if (RED_TIMEOUT)
+//    if(RED_TIMEOUT)
+//    {
+//
+//    }
+}
 void getsUart0(USER_DATA* d)
 {
   uint8_t c=0; //counter variable
@@ -236,7 +282,7 @@ void setData(uint16_t add, uint8_t data)
 void getData(uint16_t add)
 {
     char text[50];
-    sprintf(text,"%d\n",dataTable[add]);
+    sprintf(text,"%d\n\r",dataTable[add]);
     displayUart0(text);
 }
 
@@ -278,7 +324,6 @@ void controllerMode()
     GPIO_PORTB_AFSEL_R &= ~(R_MASK | D_MASK);  // *DO NOT* use peripheral to drive PB0 (UART1 TX)
     GPIO_PORTB_PCTL_R &= ~(GPIO_PCTL_PB0_M | GPIO_PCTL_PB1_M); // clear bits 0-3
 
-
     startDMX_TX();
 }
 
@@ -316,17 +361,53 @@ void clear()
 
 void startDMX_TX()
 {
+    startCode = 0;
+    RED_LED = 1;
     DE_PIN = 1;
     D_PIN  = 0;
     initTimer1(176);
     phase = 0;
 }
 
+void poll()
+{
+    if(pollIndex > 512)
+    {
+        displayUart0("polling devices completed\n\r");
+        displayUart0("controller starting to send data again\n\rAlso remember to change the max value since it has been changed to 512 for polling\n\r");
+
+//        //preparing the controller to send data again
+        while (UART1_FR_R & UART_FR_BUSY);                  // wait if uart1 tx fifo busy
+        UART1_IM_R  &= ~0x10;                 //disable the UART1 RX interrupt
+
+        GPIO_PORTB_AFSEL_R &= ~(R_MASK | D_MASK);  // *DO NOT* use peripheral to drive PB0 (UART1 TX and RX)
+        GPIO_PORTB_PCTL_R &= ~(GPIO_PCTL_PB0_M | GPIO_PCTL_PB1_M); // clear bits 0-3
+
+        pollMode = false;
+        checkBreak = false;
+        ON = true;
+        startDMX_TX();
+    }
+
+    else
+    {
+        ON = false;     //not transmitting untill poll is done
+        pollMode = true;    //stays true until the last address is polled
+        checkBreak = false; //true only when the controller is trying to receive an ack from the device
+
+        phase = 0;
+        startCode = 0xF7;
+        DE_PIN = 1;
+//        while(phase != 0);          //waiting for the last transmission to end
+        initTimer1(176);
+    }
+}
+
+
+
 
 int main(void)
 {
-    dataTable[0] = 0;               //start Code
-
     initHw();
     initUart0();
     initUart1();
@@ -384,6 +465,7 @@ int main(void)
        char text[20];
        sprintf(text, "address: %d\n\r", devAddr);
        displayUart0(text);
+       valid = true;
     }
 
     else if (isCommand(&data, "get", 1))
@@ -400,7 +482,7 @@ int main(void)
 
     else if (isCommand(&data, "max", 1))
     {
-        max = getFieldInteger(&data, 1);
+        max = getFieldInteger(&data, 1) + 2;
         valid = true;
     }
 
@@ -422,11 +504,17 @@ int main(void)
     else if(isCommand(&data, "off", 0))
     {
         ON = false;
+        RED_LED = 0;
         valid = true;
     }
 
     else if(isCommand(&data, "poll", 0))
     {
+        max = 514;                  //need to poll at all addresses to complete the polling properly; so whatever teh
+        displayUart0("Starting to poll devices on the bus\n\r");
+        pollIndex = 0;
+        pollMode = true;
+        poll();
         valid = true;
     }
 
@@ -485,10 +573,28 @@ int main(void)
     else if(isCommand(&data, "device", 1))
     {
         if (MODE == 0xFFFFFFFF)
-            displayUart0("Already in device mode\n\r");
+        {
+            uint16_t tempAddr;
+            tempAddr = getFieldInteger(&data,1);
+
+            if (tempAddr <= 512 && tempAddr > 0)
+            {
+                devAddr = getFieldInteger(&data, 1);
+                writeEeprom(DEVICE_ADDRESS_LOCATION, devAddr);
+                displayUart0("Already in device mode. Only updating the address\n\r");
+            }
+
+            else
+                displayUart0("Enter an address between 1 to 512.\n\r");
+            valid = true;
+        }
+
 
         else
+        {
             deviceMode(getFieldInteger(&data, 1));
+            displayUart0("Device mode activated \n\r");
+        }
 
         valid = true;
 

@@ -23,6 +23,7 @@
 //-----------------------------------------------------------------------------
 
 void initLEDPWM();
+void uninitPWM();
 void setLEDPWM(uint8_t rgb, uint8_t cmpb);
 
 

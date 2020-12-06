@@ -21,6 +21,11 @@
 #ifndef UART0_H_
 #define UART0_H_
 
+
+//global variables
+extern uint32_t MODE;
+extern uint8_t RED_TIMEOUT_OFF;
+
 //-----------------------------------------------------------------------------
 // Subroutines
 //-----------------------------------------------------------------------------
