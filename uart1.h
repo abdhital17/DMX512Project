@@ -23,7 +23,7 @@ extern uint8_t dataTable[];          //table that holds the data to be sent to d
 extern uint16_t phase;
 extern uint16_t devAddr;
 extern bool ON;
-
+extern uint32_t MODE;
 
 extern uint16_t pollIndex;
 extern bool pollMode;

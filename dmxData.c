@@ -67,8 +67,8 @@ uint8_t RED_TIMEOUT_OFF;
  uint8_t dataTable[513];            //table that holds the data to be sent to devices on the bus;
                                     //(receive mode contains MAB on index 0) so need an extra index to hold the last value transmitted
 
- uint8_t hr, min, sec;              //variables to hold the hour, min and sec of the day
- uint8_t mth, day;                  //variables to hold the month and day
+// uint8_t hr, min, sec;              //variables to hold the hour, min and sec of the day
+// uint8_t mth, day;                  //variables to hold the month and day
  bool ON = false;                   //run boolean to specify whether DMX transmit is ON/OFF; set by the ON/OFF commands on UART0
  uint16_t phase;                    //variable to hold the value of phase ranging from 0 (break condition) to 514
  uint16_t devAddr = 1;              //variable to hold the address of the device when in Device Mode; Default value is set to 1
@@ -91,6 +91,8 @@ char fieldType[MAX_FIELDS];
 } USER_DATA;
 
 
+#define MAX_SET 5
+uint32_t setAtTable [MAX_SET][3] = {0};
 
 //__________________________________________________subroutines_________________________________________________________________________________
 
@@ -134,6 +136,49 @@ void initHw()
 //    TIMER0_CTL_R |= TIMER_CTL_TAEN;                  // turn-on timer
 }
 
+void HIB_INIT()
+{
+    //Configure the Hibernation module
+
+     while (!(HIB_CTL_R & 0x80000000));
+     HIB_CTL_R &= ~0x1;
+
+
+     while (!(HIB_CTL_R & 0x80000000));
+     HIB_RTCM0_R = 0xFFFFFFFF;
+
+     while (!(HIB_CTL_R & 0x80000000));
+     HIB_RTCLD_R = 0;
+
+     while (!(HIB_CTL_R & 0x80000000));
+     HIB_IM_R |= 0x1;
+     NVIC_EN1_R |= 1 << (INT_HIBERNATE - 16 - 32);
+
+     while (!(HIB_CTL_R & 0x80000000));
+     HIB_CTL_R |= 0x00000041;
+
+}
+
+void alarmISR()
+{
+    while (!(HIB_CTL_R & 0x80000000));
+    HIB_IC_R |= 0x1;
+
+    setData(setAtTable[0][1], setAtTable[0][2]);
+
+    uint8_t i = 1;
+
+    while(i < MAX_SET)
+    {
+      setAtTable[i - 1][0] = setAtTable[i][0];
+      setAtTable[i - 1][1] = setAtTable[i][1];
+      setAtTable[i - 1][2] = setAtTable[i][2];
+      i++;
+    }
+
+    while (!(HIB_CTL_R & 0x80000000));
+    HIB_RTCM0_R = setAtTable[0][0];
+}
 
 void timer0ISR()
 {
@@ -260,7 +305,8 @@ int32_t getFieldInteger(USER_DATA* data, uint8_t fieldNumber)
 {
     if (fieldNumber<=data->fieldCount && data->fieldType[fieldNumber]=='n')
     {
-        return alphabetToInteger(getFieldString(data, fieldNumber));
+        //return alphabetToInteger(getFieldString(data, fieldNumber));
+        return atoi(getFieldString(data, fieldNumber));
     }
     else
         return 0;
@@ -288,27 +334,131 @@ void getData(uint16_t add)
 
 void setTime(uint8_t h, uint8_t m, uint8_t s)
 {
+    uint32_t raw_time = h*3600 + m * 60 + s;
 
+    HIB_RTCLD_R = raw_time;
 }
 
 void getTime(uint8_t* h, uint8_t* m, uint8_t* s)
 {
+    uint32_t rawTime = HIB_RTCC_R;
 
+    rawTime = rawTime%(86400 * 30);
+    rawTime = rawTime%(86400);
+
+    *h = rawTime/3600;
+    rawTime -= *h * 3600 ;
+
+    *m = rawTime/60;
+    rawTime -= *m * 60;
+
+    *s = rawTime;
 }
 
-void setDate(uint8_t m, uint8_t d)
+void setDate(uint8_t m, uint16_t d)
 {
-
+    uint32_t rawDate = 86400*(m*30 + d);
+    HIB_RTCLD_R += rawDate;
 }
 
-void getDate(uint8_t* m, uint8_t* d)
+void getDate(uint8_t* month, uint16_t* day)
 {
+    uint32_t rawDate = HIB_RTCC_R;
 
+    *month = rawDate / (86400 * 30);
+
+    *day = (rawDate % (86400 * 30)) / 86400;
 }
 
-void addTask(uint16_t a, uint8_t v, uint8_t h, uint8_t m, uint8_t s, uint8_t month, uint8_t d)
+void addTask(uint16_t a, uint8_t v, uint8_t h, uint8_t m, uint8_t s, uint8_t month, uint16_t d)
 {
+    //setAtTable
+    uint32_t raw_time = s + m*60 + h*3600;
+    raw_time = raw_time + (month * 30 + d) * 86400;
 
+    uint8_t i = 0;
+    bool found = false;
+    for(i = 0; i<MAX_SET; i++)
+    {
+        if (setAtTable[0][0] == 0)
+        {
+           setAtTable[i][0] = raw_time;
+           setAtTable[i][1] = a;
+           setAtTable[i][2] = v;
+
+           found = true;
+           //HIB_RTCM0_R = raw_time;
+           break;
+        }
+
+        if(raw_time < setAtTable[i][0])
+        {
+            uint32_t temp11, temp12, temp13;
+            temp11 = setAtTable[i][0];
+            temp12 = setAtTable[i][1];
+            temp13 = setAtTable[i][2];
+
+            setAtTable[i][0] = raw_time;
+            setAtTable[i][1] = a;
+            setAtTable[i][2] = v;
+
+            i++;
+            while(i < MAX_SET)
+            {
+                uint32_t temp21, temp22, temp23;
+
+                temp21 = setAtTable[i][0];
+                temp22 = setAtTable[i][1];
+                temp23 = setAtTable[i][2];
+
+                setAtTable[i][0] = temp11;
+                setAtTable[i][1] = temp12;
+                setAtTable[i][2] = temp13;
+
+                temp11 = temp21;
+                temp12 = temp22;
+                temp13 = temp23;
+                i++;
+            }
+
+            found = true;
+            break;
+        }
+
+        else
+        {
+            if(setAtTable[i][0] == 0)
+            {
+                setAtTable[i][0] = raw_time;
+                setAtTable[i][1] = a;
+                setAtTable[i][2] = v;
+                found = true;
+                break;
+            }
+
+            else if (setAtTable[i][0] == raw_time)
+            {
+              setAtTable[i][0] = raw_time;
+              setAtTable[i][1] = a;
+              setAtTable[i][2] = v;
+              found = true;
+              break;
+            }
+        }
+    }
+
+    if(!found)
+    {
+        displayUart0("table is full \n\r");
+    }
+
+
+    while (!(HIB_CTL_R & 0x80000000));
+    HIB_CTL_R &= ~0x1;
+    while (!(HIB_CTL_R & 0x80000000));
+    HIB_RTCM0_R = setAtTable[0][0];
+    while (!(HIB_CTL_R & 0x80000000));
+    HIB_CTL_R |= 0x00000041;
 }
 
 void controllerMode()
@@ -416,6 +566,8 @@ int main(void)
     setUart0BaudRate(115200, 40e6);
     setUart1BaudRate(250000, 40e6);
 
+    HIB_INIT();
+
 //    displayUart0("\nABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz\n\r");
 //    displayUart0("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz\n\r");
 
@@ -522,13 +674,18 @@ int main(void)
     {
         setTime(getFieldInteger(&data, 1), getFieldInteger(&data, 2), getFieldInteger(&data, 3));
         valid = true;
+
+        displayUart0("\n\rtime set!\n\rset date now..\n\r");
     }
 
     else if(isCommand(&data, "time", 0))
     {
-        char text[50];
+        uint8_t hr, min, sec;              //variables to hold the hour, min and sec of the day
+
+
         getTime(&hr, &min, &sec);
 
+        char text[50];
         sprintf(text, "time %d:%d:%d\n\r", hr, min, sec);
         displayUart0(text);
         valid = true;
@@ -543,6 +700,8 @@ int main(void)
     else if(isCommand(&data, "date", 0))
     {
         char text[50];
+        uint8_t mth;                  //variables to hold the month and day
+        uint16_t day;
 
         getDate(&mth, &day);
 
@@ -556,6 +715,21 @@ int main(void)
         addTask(getFieldInteger(&data, 1), getFieldInteger(&data, 2), getFieldInteger(&data, 3), getFieldInteger(&data, 4),
                 getFieldInteger(&data, 5), getFieldInteger(&data, 6), getFieldInteger(&data, 7));
 
+        char text[50];
+        uint8_t i = 0;
+        for(i=0; i< MAX_SET; i++)
+        {
+            sprintf(text, "A:%d  B:%d C:%d \n\r", setAtTable[i][0], setAtTable[i][1], setAtTable[i][2]);
+            displayUart0(text);
+        }
+
+        valid = true;
+    }
+
+    else if(isCommand(&data, "setat", 5))
+    {
+        addTask(getFieldInteger(&data, 1), getFieldInteger(&data, 2), getFieldInteger(&data, 3), getFieldInteger(&data, 4),
+                getFieldInteger(&data, 5), 0 , 0);
         valid = true;
     }
 

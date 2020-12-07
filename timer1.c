@@ -59,17 +59,25 @@ void timer1ISR()
     {
         if(phase == 0)
         {
+            TIMER1_CTL_R &= ~TIMER_CTL_TAEN;     // turn-off timer
+            TIMER1_IMR_R &= ~TIMER_IMR_TATOIM;   // turn-off interrupts
+
             DE_PIN = 1;
             D_PIN  = 0;         //pull D pin low to signal a break(ACK in this case)
-            phase = 1;
+            phase  = 1;
+            displayUart0("sending a break from the device side\n\r");
             initTimer1(16);
         }
 
         else if (phase == 1)
         {
+            TIMER1_CTL_R &= ~TIMER_CTL_TAEN;     // turn-off timer
+            TIMER1_IMR_R &= ~TIMER_IMR_TATOIM;   // turn-off interrupts
+
+            displayUart0("phase = 1; going back to normal settings after sending the ack\r\n");
             DE_PIN = 0;
             pollMode = false;               //this happens in receiver mode since its responsibility to send an ACK is completed
-            UART1_IM_R  &= ~0x10;                 //enable the UART1 RX interrupt for normal device mode functioning
+            UART1_IM_R  |= 0x10;                 //enable the UART1 RX interrupt for normal device mode functioning
         }
 
     }

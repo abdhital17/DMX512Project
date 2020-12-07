@@ -60,6 +60,7 @@ extern void uart0ISR(void);
 extern void uart1ISR(void);
 extern void timer1ISR(void);
 extern void timer0ISR(void);
+extern void alarmISR(void);
 
 //*****************************************************************************
 //
@@ -131,7 +132,7 @@ void (* const g_pfnVectors[])(void) =
     IntDefaultHandler,                      // CAN1
     0,                                      // Reserved
     0,                                      // Reserved
-    IntDefaultHandler,                      // Hibernate
+    alarmISR,                      // Hibernate
     IntDefaultHandler,                      // USB0
     IntDefaultHandler,                      // PWM Generator 3
     IntDefaultHandler,                      // uDMA Software Transfer

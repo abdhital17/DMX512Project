@@ -156,11 +156,11 @@ void uart1ISR()
 
    }
 
-   else if (UART1_MIS_R & 0x10)              //if rx interrupt triggered the isr
-   {
-       uint16_t data = UART1_DR_R;
-       if (pollMode && checkBreak)               //if on polling mode and it is at the phase where the controller tries to receive an ACK
+   else if (UART1_MIS_R & 0x10)             //if rx interrupt triggered the isr
+   {                                        //0xABCDEF is the controller flag; determines that the mode is in controller mode
+       if (pollMode && checkBreak && MODE == 0xABCDEF)               //if on polling mode and it is at the phase where the controller tries to receive an ACK
        {
+           uint16_t data = UART1_DR_R;
            if (data & 0x400)  //if the device sent a break
            {
               displayUart0("found at ");
@@ -183,8 +183,11 @@ void uart1ISR()
            poll();
        }
 
-       else             //if not in the mode where controller is looking for ACK, resume normal functioning
+       else             //if NOT in the controller mode where (controller is looking for ACK), resume normal functioning
+                        //only device mode reaches to this part
        {
+           uint16_t data = UART1_DR_R;
+
            if (data & 0x400)            //if break error occured in data register
            {
                initLEDPWM();
@@ -196,17 +199,26 @@ void uart1ISR()
            {
                dataTable[Rxphase] = (data & 0xFF);
 
-               if (Rxphase = 0 && (dataTable[Rxphase] & 0xFF) == 0xF7)              //since while receiving, the value at index 0 is always the start code,
+
+               if (Rxphase == 0 && (dataTable[Rxphase] & 0xFF) == 0xF7)              //since while receiving, the value at index 0 is always the start code,
                    pollMode = true;                                                     //check at index 0 to see whether the controller is sending a break
 
-               if(pollMode && (Rxphase == devAddr) && dataTable[devAddr] == 1)         //if the controller is on polling mode, then this receiver sees if it has received an ACK request from the controller
+
+               if(pollMode && (Rxphase == devAddr))//&& dataTable[devAddr] == 1)         //if the controller is on polling mode, then this receiver sees if it has received an ACK request from the controller
                {
+//                              char text[50];
+//                              sprintf(text, "address: %d, %d, %d\n\r",dataTable[devAddr-1], dataTable[devAddr], dataTable[devAddr+1] );
+//                              displayUart0(text);
+
+
                    UART1_IM_R  &= ~0x10;                 //disable the UART1 RX interrupt/ stop receiving; prepare to acknowledge
+
                    phase = 0;           //transmit phase
                    initTimer1(16);
                }
 
                Rxphase++;
+
            }
        }
 
