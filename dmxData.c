@@ -40,7 +40,7 @@
 
 //on board LED
 #define RED_LED   (*((volatile uint32_t *)(0x42000000 + (0x400253FC-0x40000000)*32 + 1*4)))  //PF1
-#define BLUE_LED  (*((volatile uint32_t *)(0x42000000 + (0x400053FC-0x40000000)*32 + 2*4)))  //PF2
+#define BLUE_LED  (*((volatile uint32_t *)(0x42000000 + (0x400253FC-0x40000000)*32 + 2*4)))  //PF2
 #define GREEN_LED (*((volatile uint32_t *)(0x42000000 + (0x400253FC-0x40000000)*32 + 3*4)))  //PF3
 
 //LED MASKS
@@ -49,7 +49,8 @@
 #define GREEN_LED_MASK 8
 
 //LED counts
-uint8_t RED_TIMEOUT_OFF;
+uint8_t LED_OFF_TIMEOUT = 0;
+uint8_t LED_ON_TIMEOUT =0;
 
 
 //Port C mask
@@ -80,6 +81,7 @@ bool pollMode = false;
 uint8_t startCode = 0;              //0x00 for transmission mode; 0xF7 for polling mode
 uint16_t pollIndex = 0;
 bool checkBreak = false;            //true when the controller releases the bus to receive an ack from the devices while polling
+uint16_t pollFound[512];
 
 //data structure to hold the incoming string through the UART0 Rx
 typedef struct _USER_DATA
@@ -107,7 +109,7 @@ void initHw()
 
     // Enable clocks
     SYSCTL_RCGCGPIO_R = SYSCTL_RCGCGPIO_R1 | SYSCTL_RCGCGPIO_R2 | SYSCTL_RCGCGPIO_R5;
-    SYSCTL_RCGCTIMER_R |=SYSCTL_RCGCTIMER_R1;
+    SYSCTL_RCGCTIMER_R |=SYSCTL_RCGCTIMER_R3;
     _delay_cycles(3);
 
     //configure the on board LEDs
@@ -126,14 +128,14 @@ void initHw()
 
 
     // Configure Timer 0 as the time base
-//    TIMER0_CTL_R &= ~TIMER_CTL_TAEN;                 // turn-off timer before reconfiguring
-//    TIMER0_CFG_R = TIMER_CFG_32_BIT_TIMER;           // configure as 32-bit timer (A+B)
-//    TIMER0_TAMR_R = TIMER_TAMR_TAMR_PERIOD;          // configure for one shot mode (count down)
-//
-//    TIMER0_TAILR_R = 4000000;
-//    TIMER0_IMR_R = TIMER_IMR_TATOIM;                 // turn-on interrupts
-//    NVIC_EN0_R |= 1 << (INT_TIMER0A-16);             // turn-on interrupt 37 (TIMER1A)
-//    TIMER0_CTL_R |= TIMER_CTL_TAEN;                  // turn-on timer
+    TIMER3_CTL_R &= ~TIMER_CTL_TAEN;                 // turn-off timer before reconfiguring
+    TIMER3_CFG_R = TIMER_CFG_32_BIT_TIMER;           // configure as 32-bit timer (A+B)
+    TIMER3_TAMR_R = TIMER_TAMR_TAMR_PERIOD;          // configure for one shot mode (count down)
+
+    TIMER3_TAILR_R = 7000000;
+    TIMER3_IMR_R = TIMER_IMR_TATOIM;                 // turn-on interrupts
+    NVIC_EN1_R |= 1 << (INT_TIMER3A-16 - 32);             // turn-on interrupt 37 (TIMER1A)
+    TIMER3_CTL_R |= TIMER_CTL_TAEN;                  // turn-on timer
 }
 
 void HIB_INIT()
@@ -159,35 +161,36 @@ void HIB_INIT()
 
 }
 
-void alarmISR()
+
+void timer3ISR()
 {
-    while (!(HIB_CTL_R & 0x80000000));
-    HIB_IC_R |= 0x1;
-
-    setData(setAtTable[0][1], setAtTable[0][2]);
-
-    uint8_t i = 1;
-
-    while(i < MAX_SET)
+    TIMER3_ICR_R = 0x1;
+    if (MODE == CONTROLLER_FLAG)
     {
-      setAtTable[i - 1][0] = setAtTable[i][0];
-      setAtTable[i - 1][1] = setAtTable[i][1];
-      setAtTable[i - 1][2] = setAtTable[i][2];
-      i++;
+      if(LED_OFF_TIMEOUT > 0)
+      {
+          LED_OFF_TIMEOUT--;
+          if (LED_OFF_TIMEOUT == 0)
+          {
+              BLUE_LED = 0;
+              GREEN_LED = 0;
+          }
+      }
+
     }
 
-    while (!(HIB_CTL_R & 0x80000000));
-    HIB_RTCM0_R = setAtTable[0][0];
+    else if (MODE == 0xFFFFFFFF)
+    {
+        if(LED_OFF_TIMEOUT > 0)
+        {
+          LED_OFF_TIMEOUT--;
+          if (LED_OFF_TIMEOUT == 0)
+              RED_LED = 0;
+         }
+
+    }
 }
 
-void timer0ISR()
-{
-    //if (RED_TIMEOUT)
-//    if(RED_TIMEOUT)
-//    {
-//
-//    }
-}
 void getsUart0(USER_DATA* d)
 {
   uint8_t c=0; //counter variable
@@ -196,6 +199,12 @@ void getsUart0(USER_DATA* d)
   {
 
     ch=getcUart0();
+    if(MODE == CONTROLLER_FLAG)
+    {
+        BLUE_LED = 1;
+        LED_OFF_TIMEOUT = 1;
+    }
+
     if ((ch==8 || ch==127) && c>0) c--;
 
     else if (ch==13)
@@ -376,6 +385,14 @@ void addTask(uint16_t a, uint8_t v, uint8_t h, uint8_t m, uint8_t s, uint8_t mon
     uint32_t raw_time = s + m*60 + h*3600;
     raw_time = raw_time + (month * 30 + d) * 86400;
 
+    uint32_t checkTime = HIB_RTCC_R;
+
+    if (raw_time < checkTime)
+    {
+        displayUart0("can not include time from the past\n\r");
+        return;
+    }
+
     uint8_t i = 0;
     bool found = false;
     for(i = 0; i<MAX_SET; i++)
@@ -511,20 +528,35 @@ void clear()
 
 void startDMX_TX()
 {
+    char text[20];
+    if(pollMode)
+    {
+        uint16_t in = 0;
+        while(in < 512)
+        {
+            if(pollFound[in] == 1)
+            {
+                displayUart0("device found\n\r");
+            }
+            in++;
+         }
+        pollMode = false;
+    }
+
     startCode = 0;
     RED_LED = 1;
     DE_PIN = 1;
     D_PIN  = 0;
-    initTimer1(176);
     phase = 0;
+    initTimer1(176);
 }
 
 void poll()
 {
-    if(pollIndex > 512)
+
+
+    if(pollIndex > 511)
     {
-        displayUart0("polling devices completed\n\r");
-        displayUart0("controller starting to send data again\n\rAlso remember to change the max value since it has been changed to 512 for polling\n\r");
 
 //        //preparing the controller to send data again
         while (UART1_FR_R & UART_FR_BUSY);                  // wait if uart1 tx fifo busy
@@ -533,14 +565,22 @@ void poll()
         GPIO_PORTB_AFSEL_R &= ~(R_MASK | D_MASK);  // *DO NOT* use peripheral to drive PB0 (UART1 TX and RX)
         GPIO_PORTB_PCTL_R &= ~(GPIO_PCTL_PB0_M | GPIO_PCTL_PB1_M); // clear bits 0-3
 
-        pollMode = false;
         checkBreak = false;
         ON = true;
+
+
+        //code and discard
+//        displayUart0("polling devices completed\n\r");
+//        displayUart0("controller starting to send data again\n\rAlso remember to change the max value since it has been changed to 512 for polling\n\r");
+
         startDMX_TX();
     }
 
+
+
     else
     {
+        waitMicrosecond(100);
         ON = false;     //not transmitting untill poll is done
         pollMode = true;    //stays true until the last address is polled
         checkBreak = false; //true only when the controller is trying to receive an ack from the device
@@ -548,11 +588,40 @@ void poll()
         phase = 0;
         startCode = 0xF7;
         DE_PIN = 1;
-//        while(phase != 0);          //waiting for the last transmission to end
+        D_PIN = 0;
+        pollIndex++;
+
         initTimer1(176);
     }
 }
 
+void alarmISR()
+{
+    while (!(HIB_CTL_R & 0x80000000));
+    HIB_IC_R |= 0x1;
+    _delay_cycles(3);
+
+    setData(setAtTable[0][1], setAtTable[0][2]);
+
+    uint8_t i = 1;
+
+    while(i < MAX_SET)
+    {
+      setAtTable[i - 1][0] = setAtTable[i][0];
+      setAtTable[i - 1][1] = setAtTable[i][1];
+      setAtTable[i - 1][2] = setAtTable[i][2];
+      i++;
+    }
+
+    if(setAtTable[MAX_SET - 1][0] != 0)
+    {
+        setAtTable[MAX_SET - 1][0] = 0;
+        setAtTable[MAX_SET - 1][1] = 0;
+        setAtTable[MAX_SET - 1][2] = 0;
+    }
+    while (!(HIB_CTL_R & 0x80000000));
+    HIB_RTCM0_R = setAtTable[0][0];
+}
 
 
 
@@ -715,6 +784,7 @@ int main(void)
         addTask(getFieldInteger(&data, 1), getFieldInteger(&data, 2), getFieldInteger(&data, 3), getFieldInteger(&data, 4),
                 getFieldInteger(&data, 5), getFieldInteger(&data, 6), getFieldInteger(&data, 7));
 
+        //code and discard
         char text[50];
         uint8_t i = 0;
         for(i=0; i< MAX_SET; i++)
@@ -756,6 +826,7 @@ int main(void)
                 devAddr = getFieldInteger(&data, 1);
                 writeEeprom(DEVICE_ADDRESS_LOCATION, devAddr);
                 displayUart0("Already in device mode. Only updating the address\n\r");
+                GREEN_LED = 0 ;
             }
 
             else

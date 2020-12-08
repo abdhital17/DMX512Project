@@ -29,6 +29,7 @@ extern uint16_t pollIndex;
 extern bool pollMode;
 extern bool checkBreak;
 
+extern uint16_t pollFound[512];
 extern void startDMX_TX();
 
 

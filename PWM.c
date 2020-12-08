@@ -60,9 +60,9 @@ void initLEDPWM()
     GPIO_PORTF_DIR_R |= RED_LED_MASK | BLUE_LED_MASK | GREEN_LED_MASK;                       // make bit 1,2,3 GPIO outputs
     GPIO_PORTF_DR2R_R |= RED_LED_MASK | BLUE_LED_MASK | GREEN_LED_MASK;                      // set drive strength to 2mA
     GPIO_PORTF_DEN_R |= RED_LED_MASK | BLUE_LED_MASK | GREEN_LED_MASK;                       // enable digital
-    GPIO_PORTF_AFSEL_R |= RED_LED_MASK | BLUE_LED_MASK | GREEN_LED_MASK;                     // select auxilary function
+    GPIO_PORTF_AFSEL_R |=BLUE_LED_MASK;                     // select auxilary function
     GPIO_PORTF_PCTL_R &= ~(GPIO_PCTL_PF1_M | GPIO_PCTL_PF2_M |GPIO_PCTL_PF3_M);
-    GPIO_PORTF_PCTL_R |= GPIO_PCTL_PF1_M1PWM5 | GPIO_PCTL_PF2_M1PWM6 | GPIO_PCTL_PF3_M1PWM7;
+    GPIO_PORTF_PCTL_R |= GPIO_PCTL_PF2_M1PWM6;
 
     // Configure PWM module 1 to drive on-board RGB LEDs
     // RED   on M1PWM5 (PF1), M1PWM2B

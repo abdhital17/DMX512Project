@@ -59,7 +59,7 @@ extern uint32_t __STACK_TOP;
 extern void uart0ISR(void);
 extern void uart1ISR(void);
 extern void timer1ISR(void);
-extern void timer0ISR(void);
+extern void timer3ISR(void);
 extern void alarmISR(void);
 
 //*****************************************************************************
@@ -108,7 +108,7 @@ void (* const g_pfnVectors[])(void) =
     IntDefaultHandler,                      // ADC Sequence 2
     IntDefaultHandler,                      // ADC Sequence 3
     IntDefaultHandler,                      // Watchdog timer
-    timer0ISR,                      // Timer 0 subtimer A
+    IntDefaultHandler,                      // Timer 0 subtimer A
     IntDefaultHandler,                      // Timer 0 subtimer B
     timer1ISR,                             // Timer 1 subtimer A
     IntDefaultHandler,                      // Timer 1 subtimer B
@@ -124,7 +124,7 @@ void (* const g_pfnVectors[])(void) =
     IntDefaultHandler,                      // GPIO Port H
     IntDefaultHandler,                      // UART2 Rx and Tx
     IntDefaultHandler,                      // SSI1 Rx and Tx
-    IntDefaultHandler,                      // Timer 3 subtimer A
+    timer3ISR,                      // Timer 3 subtimer A
     IntDefaultHandler,                      // Timer 3 subtimer B
     IntDefaultHandler,                      // I2C1 Master and Slave
     IntDefaultHandler,                      // Quadrature Encoder 1

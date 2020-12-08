@@ -21,6 +21,8 @@
 #include "uart0.h"
 #include "uart1.h"
 #include "PWM.h"
+#include <stdio.h>
+#include "wait.h"
 
 
 // PortB masks
@@ -28,6 +30,15 @@
 #define D_MASK 2
 
 #define DE_PIN     (*((volatile uint32_t *)(0x42000000 + (0x400063FC-0x40000000)*32 + 7*4)))   //port C7
+#define D_PIN      (*((volatile uint32_t *)(0x42000000 + (0x400053FC-0x40000000)*32 + 1*4)))   //port B1 -> UART1 TX
+
+#define RED_LED   (*((volatile uint32_t *)(0x42000000 + (0x400253FC-0x40000000)*32 + 1*4)))  //PF1
+#define BLUE_LED  (*((volatile uint32_t *)(0x42000000 + (0x400253FC-0x40000000)*32 + 2*4)))  //PF2
+#define GREEN_LED (*((volatile uint32_t *)(0x42000000 + (0x400253FC-0x40000000)*32 + 3*4)))  //PF3
+
+//LED counts
+extern uint8_t LED_OFF_TIMEOUT;
+extern uint8_t LED_ON_TIMEOUT;
 
 uint16_t Rxphase;
 
@@ -39,6 +50,9 @@ uint16_t Rxphase;
 //-----------------------------------------------------------------------------
 // Subroutines
 //-----------------------------------------------------------------------------
+
+//function that takes a 32 bit integer as argument
+//and then prints out the corresponding Hex value for the 32 bit integer
 
 
 // Initialize UART1
@@ -104,7 +118,9 @@ void uart1ISR()
            if(pollMode)         //if the controller is polling the device, send 1 if the pollIndex = phase -2; otherwise send a 0; pollIndex keeps on increasing to 512
            {
                if ((phase - 2) == pollIndex)
-                   sendByteUart1(1);
+               {
+                   sendByteUart1(0x1);
+               }
                else
                    sendByteUart1(0);
            }
@@ -132,14 +148,18 @@ void uart1ISR()
 
            if(pollMode)
            {
-               displayUart0("device waiting for ack\n\r");
+//               displayUart0("device waiting for ack\n\r");
                //enter code on what the controller does between when it finishes requesting ACK at an address and before it starts requesting ack at (address + 1)
-               DE_PIN = 0;
                checkBreak = true;
 
+
+               UART1_ECR_R = 0;
+               UART1_ICR_R |= 0x280;
                //prepare the controller to start receiving
-               while (UART1_FR_R & UART_FR_BUSY);                  // wait if uart1 tx fifo busy
-               UART1_IM_R &= ~0x20;                //disable the UART1 TX interrupt (if enabled)
+//               while (UART1_FR_R & UART_FR_BUSY);                  // wait if uart1 tx fifo busy
+               UART1_IM_R &= ~0x20;                //disable the UART1 TX interrupt
+               UART1_ICR_R |= 0x20;                 //clear the interrupt flags
+
                GPIO_PORTB_AFSEL_R &= ~(D_MASK);  // *DO NOT* use peripheral to drive PA1 (UART1 TX)
                GPIO_PORTB_PCTL_R &= ~(GPIO_PCTL_PB1_M); // clear bits 4-7
 
@@ -148,6 +168,7 @@ void uart1ISR()
                GPIO_PORTB_PCTL_R |= (GPIO_PCTL_PB0_U1RX); // set bits 0-3 for UART1 RX control
 
                UART1_IM_R  |= 0x10;                 //enable the UART1 RX interrupt/ start receiving ack From the device at address = pollIndex
+
            }
 
        }
@@ -157,28 +178,35 @@ void uart1ISR()
    }
 
    else if (UART1_MIS_R & 0x10)             //if rx interrupt triggered the isr
-   {                                        //0xABCDEF is the controller flag; determines that the mode is in controller mode
+   {                                         //0xABCDEF is the controller flag; determines that the mode is in controller mode
        if (pollMode && checkBreak && MODE == 0xABCDEF)               //if on polling mode and it is at the phase where the controller tries to receive an ACK
        {
+//           displayUart0("check4\r\n");
+           DE_PIN = 0;
+           waitMicrosecond(300);
            uint16_t data = UART1_DR_R;
-           if (data & 0x400)  //if the device sent a break
+           if ((data & 0x400) )
            {
-              displayUart0("found at ");
+               if(UART1_RIS_R & 0x280)
+               {
+                   pollFound[pollIndex] = 1;
+                   GREEN_LED = 1;
+                   LED_OFF_TIMEOUT = 2;
+               }
+
+               else
+                   pollFound[pollIndex] = 0;
            }
 
-           char text[20];
-           sprintf(text, "address: %d \n\r", pollIndex);
-           displayUart0(text);
-
            checkBreak = false;
-           pollIndex++;
 
            //        //preparing the controller to send data again
            while (UART1_FR_R & UART_FR_BUSY);                  // wait if uart1 tx fifo busy
-           UART1_IM_R  &= ~0x10;                 //disable the UART1 RX interrupt
-
            GPIO_PORTB_AFSEL_R &= ~(R_MASK | D_MASK);  // *DO NOT* use peripheral to drive PB0 (UART1 TX and RX)
            GPIO_PORTB_PCTL_R &= ~(GPIO_PCTL_PB0_M | GPIO_PCTL_PB1_M); // clear bits 0-3
+
+           UART1_IM_R  &= ~0x30;                 //disable the UART1 RX interrupt
+           UART1_ICR_R |= 0x30;
 
            poll();
        }
@@ -186,6 +214,7 @@ void uart1ISR()
        else             //if NOT in the controller mode where (controller is looking for ACK), resume normal functioning
                         //only device mode reaches to this part
        {
+           //displayUart0("check3\r\n");
            uint16_t data = UART1_DR_R;
 
            if (data & 0x400)            //if break error occured in data register
@@ -193,31 +222,62 @@ void uart1ISR()
                initLEDPWM();
                Rxphase = 0;
                setLEDPWM(2, dataTable[devAddr]);
+               GREEN_LED = 0;
            }
 
            else                         //if not a break
            {
-               dataTable[Rxphase] = (data & 0xFF);
-
-
-               if (Rxphase == 0 && (dataTable[Rxphase] & 0xFF) == 0xF7)              //since while receiving, the value at index 0 is always the start code,
-                   pollMode = true;                                                     //check at index 0 to see whether the controller is sending a break
-
-
-               if(pollMode && (Rxphase == devAddr))//&& dataTable[devAddr] == 1)         //if the controller is on polling mode, then this receiver sees if it has received an ACK request from the controller
+              if(Rxphase <= 515)
                {
-//                              char text[50];
-//                              sprintf(text, "address: %d, %d, %d\n\r",dataTable[devAddr-1], dataTable[devAddr], dataTable[devAddr+1] );
-//                              displayUart0(text);
+                   dataTable[Rxphase] = (data & 0xFF);
+                   GREEN_LED = 1;
 
 
-                   UART1_IM_R  &= ~0x10;                 //disable the UART1 RX interrupt/ stop receiving; prepare to acknowledge
+                   if (Rxphase == 0 && (dataTable[Rxphase] & 0xFF) == 0xF7)              //since while receiving, the value at index 0 is always the start code,
+                       pollMode = true;                                                     //check at index 0 to see whether the controller is sending a break
 
-                   phase = 0;           //transmit phase
-                   initTimer1(16);
+                           if((pollMode) && (Rxphase == 512))
+                           {
+                               if(dataTable[devAddr] == 1)
+                               {
+                                   while (UART1_FR_R & UART_FR_BUSY);                  // wait if uart1 tx fifo busy
+                                   UART1_IM_R  &= ~0x30;                              //disable the UART1 RX/TX interrupt/ stop receiving; prepare to acknowledge
+                                   GPIO_PORTB_AFSEL_R &= ~(R_MASK | D_MASK);          // do not peripheral to drive PA1 (UART1 TX)
+                                   GPIO_PORTB_PCTL_R &= ~(GPIO_PCTL_PB0_M | GPIO_PCTL_PB1_M); // clear bits 0-3
+
+
+                                   ///-----------------------code and discard-------------------------------------------
+                                   waitMicrosecond(12);
+
+                                   DE_PIN = 1;
+                                   D_PIN  = 0;         //pull D pin low to signal a break(ACK in this case)
+
+                                   waitMicrosecond(176);
+
+                                   D_PIN = 0;       //ACK
+
+                                   RED_LED = 1;
+                                   LED_OFF_TIMEOUT = 2;
+
+                                   DE_PIN = 0;
+                                   pollMode = false;               //this happens in receiver mode since its responsibility to send an ACK is completed
+                                   MODE = 0xFFFFFFFF;
+
+                                   while (UART1_FR_R & UART_FR_BUSY);                  // wait if uart1 tx fifo busy
+                                   GPIO_PORTB_AFSEL_R |= R_MASK;          // use peripheral to drive PA1 (UART1 TX)
+                                   GPIO_PORTB_PCTL_R &= ~(GPIO_PCTL_PB0_M); // clear bits 0-3
+                                   GPIO_PORTB_PCTL_R |= (GPIO_PCTL_PB0_U1RX); // set bits 0-3 for UART1 RX control
+
+                                   UART1_IM_R  |= 0x10;                 //enable the UART1 RX interrupt for normal device mode functioning
+
+                               }
+                               pollIndex++;
+                               if(pollIndex == 513)
+                                   pollMode = false;
+                           }
+
+                   Rxphase++;
                }
-
-               Rxphase++;
 
            }
        }

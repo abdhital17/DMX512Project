@@ -42,6 +42,11 @@ uint8_t readIndex = 0;
 uint8_t writeIndex = 0;
 
 #define CONTROLLER_FLAG 0xABCDEF
+
+//LED counts
+extern uint8_t LED_OFF_TIMEOUT;
+extern uint8_t LED_ON_TIMEOUT;
+
 //-----------------------------------------------------------------------------
 // Global variables
 //-----------------------------------------------------------------------------
@@ -116,11 +121,6 @@ void putsUart0(char* str)
 char getcUart0()
 {
     while (UART0_FR_R & UART_FR_RXFE);               // wait if uart0 rx fifo empty
-/*    if(MODE == CONTROLLER_FLAG)
-    {
-        BLUE_LED = 0;
-        RED_TIMEOUT_OFF = 10;
-    }*/
     return UART0_DR_R & 0xFF;                        // get character from fifo
 }
 

@@ -8,6 +8,7 @@
 
 
 
+
 //defines
 #define D_PIN      (*((volatile uint32_t *)(0x42000000 + (0x400053FC-0x40000000)*32 + 1*4)))   //port B1 -> UART1 TX
 #define DE_PIN     (*((volatile uint32_t *)(0x42000000 + (0x400063FC-0x40000000)*32 + 7*4)))   //port C7
@@ -55,35 +56,6 @@ void timer1ISR()
 {
     TIMER1_ICR_R = TIMER_ICR_TATOCINT;      //clear the interrupt flag
 
-    if(pollMode && MODE == 0xFFFFFFFF)                    //if receiver receives a  ACK request from the controller, after waiting for 16us, the device is now at this stage
-    {
-        if(phase == 0)
-        {
-            TIMER1_CTL_R &= ~TIMER_CTL_TAEN;     // turn-off timer
-            TIMER1_IMR_R &= ~TIMER_IMR_TATOIM;   // turn-off interrupts
-
-            DE_PIN = 1;
-            D_PIN  = 0;         //pull D pin low to signal a break(ACK in this case)
-            phase  = 1;
-            displayUart0("sending a break from the device side\n\r");
-            initTimer1(16);
-        }
-
-        else if (phase == 1)
-        {
-            TIMER1_CTL_R &= ~TIMER_CTL_TAEN;     // turn-off timer
-            TIMER1_IMR_R &= ~TIMER_IMR_TATOIM;   // turn-off interrupts
-
-            displayUart0("phase = 1; going back to normal settings after sending the ack\r\n");
-            DE_PIN = 0;
-            pollMode = false;               //this happens in receiver mode since its responsibility to send an ACK is completed
-            UART1_IM_R  |= 0x10;                 //enable the UART1 RX interrupt for normal device mode functioning
-        }
-
-    }
-
-    else        //normal transmission operation when starting DMX TX
-    {
         if(phase == 0)          //<<mark after break>>
         {
             D_PIN = 1;
@@ -106,6 +78,6 @@ void timer1ISR()
         }
 
         phase++;
-    }
+
 
 }
